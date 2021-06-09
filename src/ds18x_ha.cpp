@@ -1,12 +1,10 @@
-#include <errno.h>
-#include <string.h>
-
 #include <mgos.h>
 
 #include <mgos_arduino_dallas_temp.h>
 #include <mgos_homeassistant.h>
 
 #include <mgos-helpers/log.h>
+#include <mgos-helpers/mem.h>
 
 struct ds18x_ha {
   float tempC;
@@ -20,9 +18,8 @@ static void ha_dsh_temperature(struct mgos_homeassistant_object *o,
 static struct mgos_homeassistant_object *ha_obj_add(
     struct mgos_homeassistant *ha, char *name) {
   struct mgos_homeassistant_object *o = NULL;
-  struct ds18x_ha *dsh = (struct ds18x_ha *) malloc(sizeof(*dsh));
-  if (!dsh)
-    FNERR_GT("%s(%u): (%d) %s", "malloc", sizeof(*dsh), errno, strerror(errno));
+  struct ds18x_ha *dsh = NULL;
+  dsh = (struct ds18x_ha *) TRY_MALLOC_OR(goto err, dsh);
   dsh->tempC = DEVICE_DISCONNECTED_C;
 
   o = mgos_homeassistant_object_add(ha, name, COMPONENT_SENSOR, NULL, NULL,
