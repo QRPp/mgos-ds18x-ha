@@ -49,7 +49,6 @@ static struct mgos_homeassistant_object *ha_obj_get_or_add(
            dev[0] << 24 | dev[1] << 16 | dev[2] << 8 | dev[3],
            dev[4] << 24 | dev[5] << 16 | dev[6] << 8 | dev[7]);
   struct mgos_homeassistant_object *o = mgos_homeassistant_object_get(ha, name);
-  if (o) return !strcmp(o->object_name, name) ? o : NULL;
   return !o ? ha_obj_add(ha, name) : !strcmp(o->object_name, name) ? o : NULL;
 }
 
