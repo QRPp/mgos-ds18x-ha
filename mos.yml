@@ -11,7 +11,7 @@ sources:
 config_schema:
   - ["ds18x.ha", "o", {"title": "DTCL Home Assistant settings"}]
   - ["ds18x.ha.enable", "b", false, {"title": "Enable Home Assistant MQTT comms"}]
-  - ["ds18x.ha.name_prefix", "s", "ds_", {"title": "Prepend to sensor address"}]
+  - ["ds18x.ha.name_prefix", "s", "ds_", {"title": "Prepend to sensor address/name"}]
   - ["ds18x.ha.period", "i", 60, {"title": "Seconds between status updates (5+)"}]
 
 libs:

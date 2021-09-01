@@ -10,13 +10,52 @@ struct ds18x_ha {
   float tempC;
 };
 
+static char *ha_cfg() {
+  const char *fn = mgos_sys_config_get_homeassistant_config();
+  return !fn ? NULL : json_fread(fn);
+}
+
+#define HA_DS18X_FMT "{addr:%H,name:%Q}"
+static char *ha_cfg_get_name_if_json_match(struct json_token *v,
+                                           DeviceAddress dev) {
+  char *addr = NULL, *name = NULL, *ret = NULL;
+  int addrL, nameL;
+  if (json_scanf(v->ptr, v->len, HA_DS18X_FMT, &addrL, &addr, &name, &nameL) <
+      0)
+    FNERR_GT("json_scanf(%.*s): %s", v->len, v->ptr, "failed");
+  if (!addr) FNERR_GT("no %s in %.*s", "addr", v->len, v->ptr);
+  if (addrL != sizeof(DeviceAddress))
+    FNERR_GT("need %u byte %s, got %d: %.*s", sizeof(DeviceAddress), "addr",
+             addrL, v->len, v->ptr);
+  if (!name) FNERR_GT("no %s in %.*s", "name", v->len, v->ptr);
+  if (!memcmp(addr, dev, sizeof(DeviceAddress))) ret = name;
+err:
+  if (addr) free(addr);
+  if (name && !ret) free(name);
+  return ret;
+}
+
+#define HA_CONF_PATH ".provider.ds18x"
+static char *ha_cfg_get_name(DeviceAddress dev) {
+  char *list = ha_cfg(), *name = NULL;
+  if (!list) return NULL;
+  size_t len = strlen(list);
+  void *h = NULL;
+  struct json_token v;
+  while ((h = json_next_elem(list, len, h, HA_CONF_PATH, NULL, &v)) != NULL &&
+         (name = ha_cfg_get_name_if_json_match(&v, dev)) == NULL)
+    ;
+  free(list);
+  return name;
+}
+
 static void ha_dsh_temperature(struct mgos_homeassistant_object *o,
                                struct json_out *out) {
   json_printf(out, "%.4f", ((struct ds18x_ha *) o->user_data)->tempC);
 }
 
 static struct mgos_homeassistant_object *ha_obj_add(
-    struct mgos_homeassistant *ha, char *name) {
+    struct mgos_homeassistant *ha, const char *name) {
   struct mgos_homeassistant_object *o = NULL;
   struct ds18x_ha *dsh = NULL;
   dsh = (struct ds18x_ha *) TRY_MALLOC_OR(goto err, dsh);
@@ -26,7 +65,9 @@ static struct mgos_homeassistant_object *ha_obj_add(
                                     dsh);
   if (!o) FNERR_GT("failed to add HA object %s", name);
   if (!mgos_homeassistant_object_class_add(
-          o, "temperature", "\"unit_of_meas\":\"°C\"", ha_dsh_temperature))
+          o, "temperature",
+          "\"unit_of_meas\":\"°C\",\"stat_cla\":\"measurement\"",
+          ha_dsh_temperature))
     FNERR_GT("failed to add %s class to HA object %s", "temperature", name);
 
   FNLOG(LL_INFO, "added HA object %s", name);
@@ -38,13 +79,22 @@ err:
   return NULL;
 }
 
+static char *ha_obj_get_name(char *buf, size_t sz, DeviceAddress dev) {
+  char *name = ha_cfg_get_name(dev);
+  const char *pfx = mgos_sys_config_get_ds18x_ha_name_prefix() ?: "";
+  if (name) {
+    snprintf(buf, sz, "%s%s", pfx, name);
+    free(name);
+  } else
+    snprintf(buf, sz, "%s%08X%08X", pfx,
+             dev[0] << 24 | dev[1] << 16 | dev[2] << 8 | dev[3],
+             dev[4] << 24 | dev[5] << 16 | dev[6] << 8 | dev[7]);
+  return buf;
+}
+
 static struct mgos_homeassistant_object *ha_obj_get_or_add(
     struct mgos_homeassistant *ha, DeviceAddress dev) {
-  char name[32];
-  snprintf(name, sizeof(name), "%s%08X%08X",
-           mgos_sys_config_get_ds18x_ha_name_prefix(),
-           dev[0] << 24 | dev[1] << 16 | dev[2] << 8 | dev[3],
-           dev[4] << 24 | dev[5] << 16 | dev[6] << 8 | dev[7]);
+  const char *name = ha_obj_get_name((char *) alloca(32), 32, dev);
   struct mgos_homeassistant_object *o = mgos_homeassistant_object_get(ha, name);
   return !o ? ha_obj_add(ha, name) : !strcmp(o->object_name, name) ? o : NULL;
 }
