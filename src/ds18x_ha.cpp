@@ -16,7 +16,9 @@ static SLIST_HEAD(, ds18x_ha) cfg;
 
 static void ha_dsh_temperature(struct mgos_homeassistant_object *o,
                                struct json_out *out) {
-  json_printf(out, "%.4f", ((struct ds18x_ha *) o->user_data)->tempC);
+  float tempC = ((struct ds18x_ha *) o->user_data)->tempC;
+  if (tempC == DEVICE_DISCONNECTED_C) return;
+  json_printf(out, "%.4f", tempC);
 }
 
 static struct mgos_homeassistant_object *ha_obj_add(
