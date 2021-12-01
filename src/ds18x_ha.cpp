@@ -85,6 +85,8 @@ static void dsh_timer_data(void *opaque) {
     float c = ds18x->getTempC(dev);
     if (c == DEVICE_DISCONNECTED_C)
       FNERR_CONT("%s(%u): %s", "getTemp", idx, "disconnected");
+    if (c == 85)
+      FNERR_CONT("%s(%u): %s", "getTemp", idx, "bogus");
     struct mgos_homeassistant_object *o = ha_obj_get(dev);
     if (!o) continue;
     ((struct ds18x_ha *) o->user_data)->tempC = c;
